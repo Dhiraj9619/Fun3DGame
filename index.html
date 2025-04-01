@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>3D Terrain Scene with Car, Sisters & Mature Trees</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Three.js and GLTFLoader -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.145.0/examples/js/loaders/GLTFLoader.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #1e1e1e;
+      font-family: sans-serif;
+      user-select: none;
+    }
+    #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+    /* Loading Screen Styles */
+    #loadingScreen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    #loadingScreen img {
+      width: 80px;
+      margin-bottom: 20px;
+    }
+    #loadingBarContainer {
+      width: 80%;
+      height: 20px;
+      border: 2px solid #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    #loadingBar {
+      width: 0%;
+      height: 100%;
+      background: #00aaff;
+      transition: width 0.3s;
+    }
+    /* Control buttons */
+    .control-buttons {
+      position: absolute;
+      display: flex;
+      gap: 10px;
+    }
+    .left-right-controls {
+      bottom: 20px;
+      left: 20px;
+    }
+    .move-back-controls {
+      bottom: 20px;
+      right: 20px;
+    }
+    button {
+      background-color: #00aaff;
+      border: 2px solid #0077cc;
+      border-radius: 5px;
+      color: white;
+      font-size: 18px;
+      padding: 10px 20px;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+    button:active {
+      transform: scale(0.95);
+    }
+    /* UI for Score & Timer (top left) */
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #fff;
+      font-size: 20px;
+      background: rgba(0,0,0,0.5);
+      padding: 10px;
+      border-radius: 5px;
+    }
+    /* Camera control menu (top right) */
+    #cameraMenuButton {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 50%;
+    }
+    #cameraMenu {
+      position: absolute;
+      top: 40px;
+      right: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 10px;
+      color: #fff;
+      display: none;
+    }
+    #cameraMenu label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    /* Settings icon (top middle on car change menu) */
+    #settingsIcon {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      cursor: pointer;
+      padding: 5px;
+      border-radius: 50%;
+      font-size: 24px;
+    }
+    /* Car Selection Menu */
+    #carMenu {
+      position: absolute;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 10px;
+      color: #fff;
+      display: none;
+      text-align: center;
+    }
+    #carMenu button {
+      margin-top: 5px;
+      width: 100%;
+    }
+    /* Restart container: rectangular and 2x larger */
+    #restartContainer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      padding: 40px;
+      border-radius: 0;
+      color: #fff;
+      display: none;
+      text-align: center;
+      font-size: 24px;
+    }
+    #restartContainer button {
+      margin-top: 10px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loadingScreen">
+    <img src="favicon.png" alt="Favicon">
+    <div id="loadingBarContainer">
+      <div id="loadingBar"></div>
+    </div>
+  </div>
+  
+  <div id="container"></div>
+  <div class="control-buttons left-right-controls">
+    <button id="left-button">Left</button>
+    <button id="right-button">Right</button>
+  </div>
+  <div class="control-buttons move-back-controls">
+    <button id="forward-button">Move 🚗</button>
+    <button id="back-button">Back</button>
+  </div>
+  <!-- UI for Score and Timer -->
+  <div id="ui">
+    <div id="scoreDisplay">
+      <img id="sister1Score" src="sister.png" alt="Sister1" style="width:30px;vertical-align:middle;"> <span id="score1">0</span><br>
+      <img id="sister2Score" src="sister2.png" alt="Sister2" style="width:30px;vertical-align:middle; display: none;"> <span id="score2" style="display: none;">0</span><br>
+      <img id="sister3Score" src="sister3.png" alt="Sister3" style="width:30px;vertical-align:middle; display: none;"> <span id="score3" style="display: none;">0</span>
+    </div>
+    <div id="timerDisplay">Time: <span id="timer">120</span> sec</div>
+  </div>
+  <!-- Camera Control Menu -->
+  <div id="cameraMenuButton">📽️</div>
+  <div id="cameraMenu">
+    <label>
+      Camera Height:
+      <input type="range" id="camHeight" min="5" max="20" value="5">
+    </label>
+    <label>
+      Camera Angle (Vertical Offset):
+      <input type="range" id="camAngle" min="-10" max="10" value="-1">
+    </label>
+  </div>
+  <!-- Settings icon on Car Change Button -->
+  <div id="settingsIcon">⚙️</div>
+  <!-- Car Selection Menu -->
+  <div id="carMenu">
+    <button id="carBtn">Car</button>
+    <button id="car2Btn">Car 2</button>
+    <button id="car3Btn">Car 3</button>
+    <button id="car4Btn">Car 4</button>
+    <button id="car5Btn">Car 5</button>
+  </div>
+  <!-- Restart container -->
+  <div id="restartContainer">
+    <div id="finalScore"></div>
+    <button id="restartBtn">Restart</button>
+  </div>
+  <script>
+    // ---------------- Basic Scene Setup ----------------
+    const sceneData = {
+      models: [
+        {
+          fileName: "car.glb",
+          position: { x: 0, y: 0, z: 0 },
+          scale: { x: 1, y: 1, z: 1 },
+          rotationY: 0
+        },
+        {
+          fileName: "Bridge.glb",
+          position: { x: 1.008, y: -0.5, z: -10.794 },
+          scale: { x: 4.226, y: 4.226, z: 4.226 },
+          rotationY: 0
+        }
+      ],
+      terrain: {
+        width: 400,
+        height: 400,
+        depth: 0.5
+      },
+      lighting: {
+        dirLightIntensity: 0.8,
+        hemiLightIntensity: 1,
+        lightColor: "ffffff"
+      },
+      backgroundColor: "#add8e6"
+    };
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(sceneData.backgroundColor);
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.getElementById("container").appendChild(renderer.domElement);
+
+    // ---------------- Loading Screen Setup ----------------
+    const loadingScreen = document.getElementById("loadingScreen");
+    const loadingBar = document.getElementById("loadingBar");
+    let totalModels = sceneData.models.length;
+    let modelsLoaded = 0;
+    function updateLoadingProgress() {
+      let percent = (modelsLoaded / totalModels) * 100;
+      loadingBar.style.width = percent + "%";
+      if (modelsLoaded >= totalModels) {
+        setTimeout(() => { loadingScreen.style.display = "none"; }, 500);
+      }
+    }
+
+    // ---------------- Audio Setup ----------------
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    const audioLoader = new THREE.AudioLoader();
+    const moveSound = new THREE.Audio(listener);
+    const turnSound = new THREE.Audio(listener);
+    const collisionSound = new THREE.Audio(listener);
+    const scoreSound = new THREE.Audio(listener);
+    audioLoader.load('move.mp3', buffer => moveSound.setBuffer(buffer));
+    audioLoader.load('turn.mp3', buffer => turnSound.setBuffer(buffer));
+    audioLoader.load('collision.mp3', buffer => collisionSound.setBuffer(buffer));
+    audioLoader.load('score.mp3', buffer => {
+      scoreSound.setBuffer(buffer);
+      scoreSound.setVolume(0.5);
+      console.log("Score sound loaded successfully");
+    }, undefined, error => {
+      console.error("Error loading score.mp3:", error);
+    });
+
+    // ---------------- Lighting ----------------
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, sceneData.lighting.hemiLightIntensity);
+    scene.add(hemiLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, sceneData.lighting.dirLightIntensity);
+    dirLight.position.set(5, 10, 5);
+    scene.add(dirLight);
+
+    // ---------------- Terrain ----------------
+    const terrainGeometry = new THREE.BoxGeometry(sceneData.terrain.width, sceneData.terrain.depth, sceneData.terrain.height);
+    const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x556b2f, side: THREE.DoubleSide });
+    const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+    terrain.position.y = -sceneData.terrain.depth / 2;
+    scene.add(terrain);
+
+    // ---------------- Model Loading ----------------
+    const loader = new THREE.GLTFLoader();
+    let car, bridge;
+    const objects = []; // For collision detection
+    let isLoaded = false;
+    let gameActive = true;
+
+    // Helper: Random spawn position within terrain boundaries (with margin)
+    function getRandomPosition(margin = 10) {
+      const x = (Math.random() - 0.5) * (sceneData.terrain.width - margin);
+      const z = (Math.random() - 0.5) * (sceneData.terrain.height - margin);
+      return { x, z };
+    }
+
+    // Load car and bridge models with progress update
+    sceneData.models.forEach(modelData => {
+      loader.load(modelData.fileName, (gltf) => {
+        const model = gltf.scene;
+        if(modelData.fileName === "car.glb"){
+          let pos = getRandomPosition(20);
+          model.position.set(pos.x, 0, pos.z);
+        } else {
+          model.position.set(modelData.position.x, modelData.position.y, modelData.position.z);
+        }
+        model.scale.set(modelData.scale.x, modelData.scale.y, modelData.scale.z);
+        model.rotation.y = THREE.MathUtils.degToRad(modelData.rotationY);
+        scene.add(model);
+        if(modelData.fileName !== "Bridge.glb"){
+          objects.push(model);
+        }
+        if(modelData.fileName === "car.glb"){
+          car = model;
+          // Initially position camera behind the car
+          camera.position.set(0, 5, 10);
+          camera.lookAt(car.position);
+        }
+        if(modelData.fileName === "Bridge.glb"){
+          bridge = model;
+        }
+        modelsLoaded++;
+        updateLoadingProgress();
+        if(car && bridge){ isLoaded = true; }
+      }, undefined, (error) => {
+        console.error("Error loading model:", modelData.fileName, error);
+      });
+    });
+
+    // ---------------- Sister Setup (3 Clones) ----------------
+    const textureLoader = new THREE.TextureLoader();
+    const sisterTextures = [
+      textureLoader.load('sister.png', texture => texture.colorSpace = THREE.SRGBColorSpace),
+      textureLoader.load('sister2.png', (texture, error) => {
+        if (error) {
+          document.getElementById('sister2Score').style.display = 'none';
+          document.getElementById('score2').style.display = 'none';
+        } else {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          document.getElementById('sister2Score').style.display = 'inline';
+          document.getElementById('score2').style.display = 'inline';
+        }
+      }),
+      textureLoader.load('sister3.png', (texture, error) => {
+        if (error) {
+          document.getElementById('sister3Score').style.display = 'none';
+          document.getElementById('score3').style.display = 'none';
+        } else {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          document.getElementById('sister3Score').style.display = 'inline';
+          document.getElementById('score3').style.display = 'inline';
+        }
+      })
+    ];
+    let sisters = [];
+    function spawnSisters() {
+      for (let i = 0; i < 3; i++){
+        const sisterMaterial = new THREE.MeshBasicMaterial({
+          map: sisterTextures[i],
+          transparent: true,
+          side: THREE.DoubleSide
+        });
+        const sisterGeometry = new THREE.PlaneGeometry(4, 4);
+        let sister = new THREE.Mesh(sisterGeometry, sisterMaterial);
+        let pos = getRandomPosition(20);
+        sister.position.set(pos.x, 1, pos.z);
+        let downRay = new THREE.Raycaster(new THREE.Vector3(pos.x, 50, pos.z), new THREE.Vector3(0, -1, 0));
+        let intersects = downRay.intersectObject(terrain, true);
+        if(intersects.length > 0){
+          sister.position.y = intersects[0].point.y + 1.5;
+        }
+        sister.userData.isFlying = false;
+        sister.userData.flyTime = 0;
+        sister.userData.flyDuration = 60;
+        sister.userData.initialPosition = sister.position.clone();
+        sisters.push(sister);
+        scene.add(sister);
+      }
+    }
+    spawnSisters();
+
+    // ---------------- Sprite Utility for Emoji ----------------
+    function createTextSprite(message, fontSize = 32) {
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = canvas.height = fontSize;
+      context.font = fontSize + "px Arial";
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillStyle = "#ffffff";
+      context.fillText(message, canvas.width / 2, canvas.height / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      return new THREE.Sprite(material);
+    }
+
+    // ---------------- 3D Tree Setup ----------------
+    const trees = [];
+    function spawn3DTrees() {
+      const count = 60;
+      const leafColors = [0x228B22, 0x32CD32, 0x006400, 0x2E8B57];
+      for (let i = 0; i < count; i++){
+        let x, z;
+        if(Math.random() < 0.5){
+          x = (Math.random() < 0.5) ? -sceneData.terrain.width/2 + 5 : sceneData.terrain.width/2 - 5;
+          z = (Math.random()-0.5) * sceneData.terrain.height;
+        } else {
+          x = (Math.random()-0.5) * sceneData.terrain.width;
+          z = (Math.random() < 0.5) ? -sceneData.terrain.height/2 + 5 : sceneData.terrain.height/2 - 5;
+        }
+        const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.5, 5, 8);
+        const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+        const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+        trunk.position.y = 2.5;
+        const leafColor = leafColors[Math.floor(Math.random() * leafColors.length)];
+        const foliageGeometry = new THREE.SphereGeometry(3, 16, 16);
+        const foliageMaterial = new THREE.MeshStandardMaterial({ color: leafColor });
+        const centralFoliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+        centralFoliage.position.y = 5;
+        const sideFoliageGeometry = new THREE.SphereGeometry(2.5, 16, 16);
+        const leftFoliage = new THREE.Mesh(sideFoliageGeometry, new THREE.MeshStandardMaterial({ color: leafColor }));
+        leftFoliage.position.set(-2.5, 5, 0);
+        const rightFoliage = new THREE.Mesh(sideFoliageGeometry, new THREE.MeshStandardMaterial({ color: leafColor }));
+        rightFoliage.position.set(2.5, 5, 0);
+        const tree = new THREE.Group();
+        tree.add(trunk);
+        tree.add(centralFoliage);
+        tree.add(leftFoliage);
+        tree.add(rightFoliage);
+        if(Math.random() < 0.5){
+          for(let j = 0; j < 3; j++){
+            const dotGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+            const dotColor = (Math.random() < 0.5) ? 0xff0000 : 0x00ff00;
+            const dotMaterial = new THREE.MeshStandardMaterial({ color: dotColor });
+            const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+            const theta = Math.random() * Math.PI/2;
+            const phi = Math.random() * Math.PI * 2;
+            const r = 3; 
+            dot.position.set(
+              Math.sin(theta) * Math.cos(phi) * r,
+              Math.cos(theta) * r,
+              Math.sin(theta) * Math.sin(phi) * r
+            );
+            dot.position.add(centralFoliage.position);
+            tree.add(dot);
+          }
+        }
+        let posForRay = new THREE.Vector3(x, 50, z);
+        let downRay = new THREE.Raycaster(posForRay, new THREE.Vector3(0, -1, 0));
+        let intersects = downRay.intersectObject(terrain, true);
+        if(intersects.length > 0){
+          tree.position.set(x, intersects[0].point.y, z);
+        } else {
+          tree.position.set(x, 0, z);
+        }
+        trees.push(tree);
+        scene.add(tree);
+        objects.push(tree);
+      }
+    }
+    spawn3DTrees();
+
+    // ---------------- Flower and Cloud Setup ----------------
+    const flowerEmojis = ["🌼", "🌻", "🎋", "🍄", "🪻"];
+    function spawnFlowers() {
+      const count = 60;
+      for (let i = 0; i < count; i++){
+        const emoji = flowerEmojis[Math.floor(Math.random() * flowerEmojis.length)];
+        let flower = createTextSprite(emoji, 32);
+        let x = (Math.random()-0.5) * sceneData.terrain.width;
+        let z = (Math.random()-0.5) * sceneData.terrain.height;
+        let posForRay = new THREE.Vector3(x, 50, z);
+        let downRay = new THREE.Raycaster(posForRay, new THREE.Vector3(0, -1, 0));
+        let intersects = downRay.intersectObject(terrain, true);
+        if(intersects.length > 0){
+          flower.position.set(x, intersects[0].point.y + 0.1, z);
+        } else {
+          flower.position.set(x, 0.5, z);
+        }
+        scene.add(flower);
+      }
+    }
+    spawnFlowers();
+
+    function spawnClouds() {
+      const count = 5;
+      for (let i = 0; i < count; i++){
+        let cloud = createTextSprite("☁️", 128);
+        let x = (Math.random()-0.5) * sceneData.terrain.width;
+        let z = (Math.random()-0.5) * sceneData.terrain.height;
+        let y = 30 + Math.random() * 10;
+        cloud.position.set(x, y, z);
+        cloud.scale.set(3, 3, 1);
+        scene.add(cloud);
+      }
+    }
+    spawnClouds();
+
+    // ---------------- Snow Particle System ----------------
+const snowParticles = new THREE.Group();
+
+function createRoundParticleTexture() {
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  
+  // Transparent background
+  ctx.clearRect(0, 0, size, size);
+  
+  // White circular snowflake
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  
+  return new THREE.CanvasTexture(canvas);
+}
+
+const roundTexture = createRoundParticleTexture();
+
+function spawnSnow() {
+  const particleCount = 200;
+  const geometry = new THREE.BufferGeometry();
+  const positions = [];
+  
+  for (let i = 0; i < particleCount; i++) {
+    positions.push(
+      (Math.random() - 0.5) * sceneData.terrain.width,
+      Math.random() * 50 + 20,
+      (Math.random() - 0.5) * sceneData.terrain.height
+    );
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+  // Use round texture in material
+  const material = new THREE.PointsMaterial({ 
+    map: roundTexture, 
+    transparent: true, 
+    alphaTest: 0.5, 
+    color: 0xffffff, 
+    size: 1.2, // Bigger snowflakes
+    sizeAttenuation: true 
+  });
+
+  const particles = new THREE.Points(geometry, material);
+  snowParticles.add(particles);
+  scene.add(snowParticles);
+}
+
+spawnSnow();
+
+    // ---------------- Improved Sister Flying Animation ----------------
+    function animateSisterFlying(sister) {
+      sister.userData.flyTime++;
+      const progress = sister.userData.flyTime / sister.userData.flyDuration;
+      const carDirection = car.getWorldDirection(new THREE.Vector3());
+      sister.position.x = sister.userData.initialPosition.x + carDirection.x * progress * 20;
+      sister.position.y = sister.userData.initialPosition.y + Math.sin(progress * Math.PI) * 5;
+      sister.position.z = sister.userData.initialPosition.z + carDirection.z * progress * 20;
+      sister.rotation.y += 0.1;
+      camera.lookAt(sister.position);
+      if (sister.userData.flyTime >= sister.userData.flyDuration) {
+        let pos = getRandomPosition(20);
+        sister.position.set(pos.x, 0, pos.z);
+        let down = new THREE.Raycaster(new THREE.Vector3(pos.x, 50, pos.z), new THREE.Vector3(0, -1, 0));
+        let ints = down.intersectObject(terrain, true);
+        if (ints.length > 0) {
+          sister.position.y = ints[0].point.y + 1;
+        }
+        sister.userData.initialPosition = sister.position.clone();
+        sister.userData.flyTime = 0;
+        sister.userData.isFlying = false;
+        camera.lookAt(car.position);
+      }
+    }
+
+    // ---------------- Movement Controls ----------------
+    let moveForward = false, moveLeft = false, moveRight = false, moveBack = false;
+    function handleControlEvents(buttonId, action) {
+      const button = document.getElementById(buttonId);
+      button.addEventListener('mousedown', () => { action(true); });
+      button.addEventListener('mouseup', () => { action(false); });
+      button.addEventListener('touchstart', (e) => { e.preventDefault(); action(true); });
+      button.addEventListener('touchend', (e) => { e.preventDefault(); action(false); });
+    }
+    handleControlEvents('forward-button', state => {
+      moveForward = state; 
+      if(state && moveSound.isPlaying) moveSound.stop(); 
+      if(state) moveSound.play(); 
+    });
+    handleControlEvents('back-button', state => {
+      moveBack = state; 
+      if(state && moveSound.isPlaying) moveSound.stop(); 
+      if(state) moveSound.play(); 
+    });
+    handleControlEvents('left-button', state => {
+      moveLeft = state; 
+      if(state && turnSound.isPlaying) turnSound.stop(); 
+      if(state) turnSound.play(); 
+    });
+    handleControlEvents('right-button', state => {
+      moveRight = state; 
+      if(state && turnSound.isPlaying) turnSound.stop(); 
+      if(state) turnSound.play(); 
+    });
+
+    // ---------------- Raycasters & Collision Variables ----------------
+    const raycaster = new THREE.Raycaster();
+    const downRaycaster = new THREE.Raycaster();
+    const sideRaycaster = new THREE.Raycaster();
+    const collisionDistance = 0.05;
+    const stepHeight = 0.2;
+    let targetRotationX = 0;
+    let targetRotationZ = 0;
+    const rotationSmoothing = 0.1;
+    const pitchFactor = 0.8;
+    const rollReductionFactor = 0.1;
+
+    // ---------------- Score and Timer System ----------------
+    let score1 = 0, score2 = 0, score3 = 0;
+    const scoreDisplay1 = document.getElementById("score1");
+    const scoreDisplay2 = document.getElementById("score2");
+    const scoreDisplay3 = document.getElementById("score3");
+    const timerDisplay = document.getElementById("timer");
+    let timer = 120;
+    let timerInterval = setInterval(() => {
+      if(timer > 0 && gameActive){
+        timer--;
+        timerDisplay.innerText = timer;
+      } else if (timer <= 0 && gameActive) {
+        clearInterval(timerInterval);
+        endGame();
+      }
+    }, 1000);
+    function endGame(){
+      gameActive = false;
+      document.getElementById("finalScore").innerHTML = `
+        Time Over! Scores:<br>
+        <img src="sister.png" style="width:30px;">: ${score1}<br>
+        <img src="sister2.png" style="width:30px;">: ${score2}<br>
+        <img src="sister3.png" style="width:30px;">: ${score3}<br>
+      `;
+      document.getElementById("restartContainer").style.display = "block";
+    }
+    document.getElementById("restartBtn").addEventListener("click", () => {
+      location.reload();
+    });
+
+    // ---------------- Camera Setup ----------------
+    let desiredCameraPos = new THREE.Vector3();
+    
+    // ---------------- Animation Loop ----------------
+    function animate() {
+      requestAnimationFrame(animate);
+      if(!isLoaded || !gameActive){ 
+        renderer.render(scene, camera);
+        return;
+      }
+      if(car){
+        const oldPosition = car.position.clone();
+        if(moveForward){ 
+          car.translateZ(0.7);
+        }
+        if(moveBack){ 
+          car.translateZ(-0.4);
+        }
+        if(moveLeft){ 
+          car.rotation.y += 0.015;
+        }
+        if(moveRight){ 
+          car.rotation.y -= 0.015;
+        }
+        raycaster.set(car.position, car.getWorldDirection(new THREE.Vector3(0, 0, 1)));
+        const collisions = raycaster.intersectObjects(objects, true);
+        if(collisions.length > 0 && collisions[0].distance < collisionDistance){
+          car.position.copy(oldPosition);
+        }
+        downRaycaster.set(car.position.clone().add(new THREE.Vector3(0, 1, 0)), new THREE.Vector3(0, -1, 0));
+        const downIntersects = downRaycaster.intersectObjects([terrain, bridge], true);
+        if (downIntersects.length > 0) {
+          const newY = downIntersects[0].point.y + 0.1;
+          car.position.y = newY;
+          const normal = downIntersects[0].face.normal.clone();
+          normal.applyQuaternion(downIntersects[0].object.quaternion);
+          const forward = car.getWorldDirection(new THREE.Vector3(0, 0, 1));
+          const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+          const pitch = Math.asin(-normal.dot(forward));
+          const roll = Math.asin(normal.dot(right));
+          targetRotationX = THREE.MathUtils.clamp(pitch * pitchFactor, -Math.PI / 4, Math.PI / 4);
+          targetRotationZ = THREE.MathUtils.clamp(roll * rollReductionFactor, -Math.PI / 6, Math.PI / 6);
+        } else {
+          targetRotationX = 0;
+          targetRotationZ = 0;
+        }
+        car.rotation.x = THREE.MathUtils.lerp(car.rotation.x, targetRotationX, rotationSmoothing);
+        car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, targetRotationZ, rotationSmoothing);
+        const forwardDirection = car.getWorldDirection(new THREE.Vector3(0, 0, 1));
+        sideRaycaster.set(car.position.clone().add(new THREE.Vector3(0, 0.2, 0)), forwardDirection);
+        const stepCollisions = sideRaycaster.intersectObject(bridge, true);
+        if (stepCollisions.length > 0 && stepCollisions[0].distance < collisionDistance) {
+          car.position.y += stepHeight;
+        }
+        sisters.forEach((sister, index) => {
+          if(!sister.userData.isFlying){
+            const dist = car.position.distanceTo(sister.position);
+            if(dist < 3){
+              console.log("Collision with sister", index);
+              if(scoreSound.isPlaying) scoreSound.stop();
+              scoreSound.play();
+              if (index === 0) { score1++; scoreDisplay1.innerText = score1; }
+              if (index === 1) { score2++; scoreDisplay2.innerText = score2; }
+              if (index === 2) { score3++; scoreDisplay3.innerText = score3; }
+              sister.userData.isFlying = true;
+              sister.userData.flyTime = 0;
+              sister.userData.initialPosition = sister.position.clone();
+            }
+          } else {
+            animateSisterFlying(sister);
+          }
+        });
+        // New Camera Setup: position behind the car so that the car's front is visible.
+        const cameraDistance = 9;
+        const camHeight = parseFloat(document.getElementById("camHeight").value);
+        const camAngleOffset = parseFloat(document.getElementById("camAngle").value);
+        // Get car's forward direction and then place camera behind it.
+        let carForward = car.getWorldDirection(new THREE.Vector3());
+        desiredCameraPos.copy(car.position).sub(carForward.multiplyScalar(cameraDistance));
+        // Add vertical offset based on both the Camera Height and the Camera Angle slider.
+        desiredCameraPos.y = car.position.y + camHeight + camAngleOffset;
+        camera.position.lerp(desiredCameraPos, 0.1);
+        camera.lookAt(car.position);
+        const halfWidth = sceneData.terrain.width / 2 - 5;
+        const halfHeight = sceneData.terrain.height / 2 - 5;
+        car.position.x = THREE.MathUtils.clamp(car.position.x, -halfWidth, halfWidth);
+        car.position.z = THREE.MathUtils.clamp(car.position.z, -halfHeight, halfHeight);
+      }
+      // Animate snow particles: move downward and reset when they pass below a threshold.
+      snowParticles.children.forEach(particles => {
+        const positions = particles.geometry.attributes.position.array;
+        for(let i = 1; i < positions.length; i += 3){
+          positions[i] -= 0.1;
+          if(positions[i] < 0){
+            positions[i] = Math.random() * 50 + 20;
+          }
+        }
+        particles.geometry.attributes.position.needsUpdate = true;
+      });
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ---------------- Camera Menu Toggle ----------------
+    const cameraMenuButton = document.getElementById("cameraMenuButton");
+    const cameraMenu = document.getElementById("cameraMenu");
+    cameraMenuButton.addEventListener("click", () => {
+      cameraMenu.style.display = cameraMenu.style.display === "block" ? "none" : "block";
+    });
+
+    // ---------------- Car Selection ----------------
+    const carButtons = ["carBtn", "car2Btn", "car3Btn", "car4Btn", "car5Btn"];
+    carButtons.forEach((btnId, index) => {
+      document.getElementById(btnId).addEventListener("click", () => {
+        if (car) scene.remove(car);
+        loader.load(`car${index + 1}.glb`, (gltf) => {
+          const newCar = gltf.scene;
+          newCar.position.copy(car.position);
+          newCar.scale.set(1, 1, 1);
+          scene.add(newCar);
+          car = newCar;
+          camera.lookAt(car.position.clone().add(new THREE.Vector3(0, 0, 0.1)));
+        });
+      });
+    });
+
+    // ---------------- Settings Menu Toggle (for Car Change) ----------------
+    const settingsIcon = document.getElementById("settingsIcon");
+    const carMenu = document.getElementById("carMenu");
+    settingsIcon.addEventListener("click", () => {
+      carMenu.style.display = carMenu.style.display === "block" ? "none" : "block";
+    });
+  </script>
+</body>
+</html>
